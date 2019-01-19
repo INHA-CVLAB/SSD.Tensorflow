@@ -20,7 +20,7 @@ import tensorflow as tf
 
 slim = tf.contrib.slim
 
-VOC_LABELS = {
+VOC_LABELS = { #21
     'none': (0, 'Background'),
     'aeroplane': (1, 'Vehicle'),
     'bicycle': (2, 'Vehicle'),
@@ -128,13 +128,37 @@ COCO_LABELS = {
     "orange":  (50, 'food')
   }
 
+KITTI_LABELS = {
+
+
+}
+
+DOMESTIC_ROAD_LABELS = { #15
+    "Car":1,
+    "Pedestrian":2,
+    "Cyclist":3,
+    "Motorcyclist":4,
+    "Truck":5,
+    "Bus":6,
+    "Van":7,
+    "Red":8,
+    "RedLeft":9,
+    "Green":10,
+    "GreenLeft":11,
+    "Yellow":12,
+    "V_front": 13,
+    "V_rear": 14,
+    "DontCare":15
+}
+
+
 # use dataset_inspect.py to get these summary
 data_splits_num = {
     'train': 22136,
     'val': 4952,
 }
 
-def slim_get_batch(num_classes, batch_size, split_name, file_pattern, num_readers, num_preprocessing_threads, image_preprocessing_fn, anchor_encoder, num_epochs=None, is_training=True):
+def slim_get_batch(num_classes, batch_size, split_name, file_pattern, num_readers, num_preprocessing_threads, image_preprocessing_fn, anchor_encoder_fn, num_epochs=None, is_training=True):
     """Gets a dataset tuple with instructions for reading Pascal VOC dataset.
 
     Args:
@@ -145,7 +169,7 @@ def slim_get_batch(num_classes, batch_size, split_name, file_pattern, num_reader
       num_readers: the max number of reader used for reading tfrecords.
       num_preprocessing_threads: the max number of threads used to run preprocessing function.
       image_preprocessing_fn: the function used to dataset augumentation.
-      anchor_encoder: the function used to encoder all anchors.
+      anchor_encoder_fn: the function used to encoder all anchors.
       num_epochs: total epoches for iterate this dataset.
       is_training: whether we are in traing phase.
 
@@ -158,35 +182,36 @@ def slim_get_batch(num_classes, batch_size, split_name, file_pattern, num_reader
     # Features in Pascal VOC TFRecords.
     keys_to_features = {
         'image/encoded': tf.FixedLenFeature((), tf.string, default_value=''),
-        'image/format': tf.FixedLenFeature((), tf.string, default_value='jpeg'),
+        'image/format': tf.FixedLenFeature((), tf.string, default_value='jpg'), #VOC: 'jpeg'
         'image/filename': tf.FixedLenFeature((), tf.string, default_value=''),
         'image/height': tf.FixedLenFeature([1], tf.int64),
         'image/width': tf.FixedLenFeature([1], tf.int64),
-        'image/channels': tf.FixedLenFeature([1], tf.int64),
-        'image/shape': tf.FixedLenFeature([3], tf.int64),
+        # 'image/channels': tf.FixedLenFeature([1], tf.int64),
+        # 'image/shape': tf.FixedLenFeature([3], tf.int64),
         'image/object/bbox/xmin': tf.VarLenFeature(dtype=tf.float32),
         'image/object/bbox/ymin': tf.VarLenFeature(dtype=tf.float32),
         'image/object/bbox/xmax': tf.VarLenFeature(dtype=tf.float32),
         'image/object/bbox/ymax': tf.VarLenFeature(dtype=tf.float32),
-        'image/object/bbox/label': tf.VarLenFeature(dtype=tf.int64),
-        'image/object/bbox/difficult': tf.VarLenFeature(dtype=tf.int64),
-        'image/object/bbox/truncated': tf.VarLenFeature(dtype=tf.int64),
+        'image/object/bbox/label': tf.VarLenFeature(dtype=tf.int64)
+        # 'image/object/bbox/difficult': tf.VarLenFeature(dtype=tf.int64),
+        # 'image/object/bbox/truncated': tf.VarLenFeature(dtype=tf.int64),
     }
     items_to_handlers = {
         'image': slim.tfexample_decoder.Image('image/encoded', 'image/format'),
         'filename': slim.tfexample_decoder.Tensor('image/filename'),
-        'shape': slim.tfexample_decoder.Tensor('image/shape'),
-        'object/bbox': slim.tfexample_decoder.BoundingBox(
-                ['ymin', 'xmin', 'ymax', 'xmax'], 'image/object/bbox/'),
-        'object/label': slim.tfexample_decoder.Tensor('image/object/bbox/label'),
-        'object/difficult': slim.tfexample_decoder.Tensor('image/object/bbox/difficult'),
-        'object/truncated': slim.tfexample_decoder.Tensor('image/object/bbox/truncated'),
+        # 'shape': slim.tfexample_decoder.Tensor('image/shape'),
+        'object/bbox': slim.tfexample_decoder.BoundingBox(['ymin', 'xmin', 'ymax', 'xmax'], 'image/object/bbox/'),
+        'object/label': slim.tfexample_decoder.Tensor('image/object/bbox/label')
+        # 'object/difficult': slim.tfexample_decoder.Tensor('image/object/bbox/difficult'),
+        # 'object/truncated': slim.tfexample_decoder.Tensor('image/object/bbox/truncated'),
     }
     decoder = slim.tfexample_decoder.TFExampleDecoder(keys_to_features, items_to_handlers)
 
     labels_to_names = {}
-    for name, pair in VOC_LABELS.items():
-        labels_to_names[pair[0]] = name
+    #for name, pair in VOC_LABELS.items():
+    for name, pair in DOMESTIC_ROAD_LABELS.items():
+        #labels_to_names[pair[0]] = name
+        labels_to_names[pair] = name
 
     dataset = slim.dataset.Dataset(
                 data_sources=file_pattern,
@@ -206,33 +231,30 @@ def slim_get_batch(num_classes, batch_size, split_name, file_pattern, num_reader
             shuffle=is_training,
             num_epochs=num_epochs)
 
-    [org_image, filename, shape, glabels_raw, gbboxes_raw, isdifficult] = provider.get(['image', 'filename', 'shape',
-                                                                     'object/label',
-                                                                     'object/bbox',
-                                                                     'object/difficult'])
+    #[org_image, filename, shape, glabels_raw, gbboxes_raw, isdifficult] = provider.get(['image', 'filename', 'shape', 'object/label', 'object/bbox', 'object/difficult'])
+    [org_image, filename, glabels_raw, gbboxes_raw] = provider.get(['image', 'filename', 'object/label', 'object/bbox'])
 
-    if is_training:
+    # if is_training:
         # if all is difficult, then keep the first one
-        isdifficult_mask =tf.cond(tf.count_nonzero(isdifficult, dtype=tf.int32) < tf.shape(isdifficult)[0],
-                                lambda : isdifficult < tf.ones_like(isdifficult),
-                                lambda : tf.one_hot(0, tf.shape(isdifficult)[0], on_value=True, off_value=False, dtype=tf.bool))
+        # isdifficult_mask =tf.cond(tf.count_nonzero(isdifficult, dtype=tf.int32) < tf.shape(isdifficult)[0],
+        #                         lambda : isdifficult < tf.ones_like(isdifficult),
+        #                         lambda : tf.one_hot(0, tf.shape(isdifficult)[0], on_value=True, off_value=False, dtype=tf.bool))
 
-        glabels_raw = tf.boolean_mask(glabels_raw, isdifficult_mask)
-        gbboxes_raw = tf.boolean_mask(gbboxes_raw, isdifficult_mask)
+        # glabels_raw = tf.boolean_mask(glabels_raw, isdifficult_mask)
+        # gbboxes_raw = tf.boolean_mask(gbboxes_raw, isdifficult_mask)
 
     # Pre-processing image, labels and bboxes.
-
     if is_training:
         image, glabels, gbboxes = image_preprocessing_fn(org_image, glabels_raw, gbboxes_raw)
     else:
         image = image_preprocessing_fn(org_image, glabels_raw, gbboxes_raw)
         glabels, gbboxes = glabels_raw, gbboxes_raw
 
-    gt_targets, gt_labels, gt_scores = anchor_encoder(glabels, gbboxes)
+    gt_targets, gt_labels, gt_scores = anchor_encoder_fn(glabels, gbboxes)
 
-    return tf.train.batch([image, filename, shape, gt_targets, gt_labels, gt_scores],
-                    dynamic_pad=False,
-                    batch_size=batch_size,
-                    allow_smaller_final_batch=(not is_training),
-                    num_threads=num_preprocessing_threads,
-                    capacity=64 * batch_size)
+    return tf.train.batch([image, filename, gt_targets, gt_labels, gt_scores], #[image, filename, shape, gt_targets, gt_labels, gt_scores]
+                            dynamic_pad=False,
+                            batch_size=batch_size,
+                            allow_smaller_final_batch=(not is_training),
+                            num_threads=num_preprocessing_threads,
+                            capacity=64 * batch_size)

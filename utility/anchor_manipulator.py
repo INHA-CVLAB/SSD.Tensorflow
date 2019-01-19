@@ -145,7 +145,7 @@ class AnchorEncoder(object):
                 list_anchors_ymax.append(tf.reshape(anchors_ymax_, [-1]))
                 list_anchors_xmax.append(tf.reshape(anchors_xmax_, [-1]))
 
-                tiled_allowed_borders.extend([self._allowed_borders[ind]] * all_num_anchors_depth[ind] * all_num_anchors_spatial[ind])
+                tiled_allowed_borders.extend([self._allowed_borders[ind]] * all_num_anchors_depth[ind] * all_num_anchors_spatial[ind]) #?
 
             anchors_ymin = tf.concat(list_anchors_ymin, 0, name='concat_ymin')
             anchors_xmin = tf.concat(list_anchors_xmin, 0, name='concat_xmin')
@@ -160,12 +160,11 @@ class AnchorEncoder(object):
 
             anchor_allowed_borders = tf.stack(tiled_allowed_borders, 0, name='concat_allowed_borders')
 
-            inside_mask = tf.logical_and(tf.logical_and(anchors_ymin > -anchor_allowed_borders * 1.,
-                                                        anchors_xmin > -anchor_allowed_borders * 1.),
-                                        tf.logical_and(anchors_ymax < (1. + anchor_allowed_borders * 1.),
-                                                        anchors_xmax < (1. + anchor_allowed_borders * 1.)))
+            inside_mask = tf.logical_and(tf.logical_and(anchors_ymin >      -anchor_allowed_borders * 1.,  anchors_xmin >      -anchor_allowed_borders * 1.),
 
-            anchors_point = tf.stack([anchors_ymin, anchors_xmin, anchors_ymax, anchors_xmax], axis=-1)
+                                         tf.logical_and(anchors_ymax < (1. + anchor_allowed_borders * 1.), anchors_xmax < (1. + anchor_allowed_borders * 1.)))
+
+            anchors_point = tf.stack([anchors_ymin, anchors_xmin, anchors_ymax, anchors_xmax], axis=-1) #stack by row
 
             # save_anchors_op = tf.py_func(save_anchors,
             #                 [bboxes,
@@ -176,13 +175,17 @@ class AnchorEncoder(object):
             # with tf.control_dependencies([save_anchors_op]):
             overlap_matrix = iou_matrix(bboxes, anchors_point) * tf.cast(tf.expand_dims(inside_mask, 0), tf.float32)
             matched_gt, gt_scores = do_dual_max_match(overlap_matrix, self._ignore_threshold, self._positive_threshold)
+
             # get all positive matching positions
             matched_gt_mask = matched_gt > -1
             matched_indices = tf.clip_by_value(matched_gt, 0, tf.int64.max)
+
             # the labels here maybe chaos at those non-positive positions
             gt_labels = tf.gather(labels, matched_indices)
+
             # filter the invalid labels
             gt_labels = gt_labels * tf.cast(matched_gt_mask, tf.int64)
+
             # set those ignored positions to -1
             gt_labels = gt_labels + (-1 * tf.cast(matched_gt < -1, tf.int64))
 
@@ -191,17 +194,20 @@ class AnchorEncoder(object):
             # transform to center / size.
             gt_cy, gt_cx, gt_h, gt_w = self.point2center(gt_ymin, gt_xmin, gt_ymax, gt_xmax)
             anchor_cy, anchor_cx, anchor_h, anchor_w = self.point2center(anchors_ymin, anchors_xmin, anchors_ymax, anchors_xmax)
+
             # encode features.
             # the prior_scaling (in fact is 5 and 10) is use for balance the regression loss of center and with(or height)
             gt_cy = (gt_cy - anchor_cy) / anchor_h / self._prior_scaling[0]
             gt_cx = (gt_cx - anchor_cx) / anchor_w / self._prior_scaling[1]
             gt_h = tf.log(gt_h / anchor_h) / self._prior_scaling[2]
             gt_w = tf.log(gt_w / anchor_w) / self._prior_scaling[3]
+
             # now gt_localizations is our regression object, but also maybe chaos at those non-positive positions
             if debug:
                 gt_targets = tf.stack([anchors_ymin, anchors_xmin, anchors_ymax, anchors_xmax], axis=-1)
             else:
                 gt_targets = tf.stack([gt_cy, gt_cx, gt_h, gt_w], axis=-1)
+
             # set all targets of non-positive positions to 0
             gt_targets = tf.expand_dims(tf.cast(matched_gt_mask, tf.float32), -1) * gt_targets
             self._all_anchors = (anchor_cy, anchor_cx, anchor_h, anchor_w)
@@ -285,13 +291,13 @@ class AnchorCreator(object):
                        [5, 5, 5, 5, 5]]
         '''
         with tf.name_scope('get_layer_anchors'):
-            x_on_layer, y_on_layer = tf.meshgrid(tf.range(layer_shape[1]), tf.range(layer_shape[0]))
+            x_on_layer, y_on_layer = tf.meshgrid(tf.range(layer_shape[1]), tf.range(layer_shape[0])) #(38,38)
 
-            y_on_image = (tf.cast(y_on_layer, tf.float32) + offset) * layer_step / self._img_shape[0]
-            x_on_image = (tf.cast(x_on_layer, tf.float32) + offset) * layer_step / self._img_shape[1]
+            y_on_image = (tf.cast(y_on_layer, tf.float32) + offset) * layer_step / self._img_shape[0] #
+            x_on_image = (tf.cast(x_on_layer, tf.float32) + offset) * layer_step / self._img_shape[1] #
 
-            num_anchors_along_depth = len(anchor_scale) * len(anchor_ratio) + len(extra_anchor_scale)
-            num_anchors_along_spatial = layer_shape[1] * layer_shape[0]
+            num_anchors_along_depth = len(anchor_scale) * len(anchor_ratio) + len(extra_anchor_scale) #
+            num_anchors_along_spatial = layer_shape[1] * layer_shape[0] # 38 * 38
 
             list_h_on_image = []
             list_w_on_image = []
@@ -319,13 +325,13 @@ class AnchorCreator(object):
         all_anchors = []
         all_num_anchors_depth = []
         all_num_anchors_spatial = []
-        for layer_index, layer_shape in enumerate(self._layers_shapes):
+        for layer_index, layer_shape in enumerate(self._layers_shapes): #[(38,38),(19,19),(10,10),(5,5),(3,3),(1,1)]
             anchors_this_layer = self.get_layer_anchors(layer_shape,
-                                                        self._anchor_scales[layer_index],
-                                                        self._extra_anchor_scales[layer_index],
-                                                        self._anchor_ratios[layer_index],
-                                                        self._layer_steps[layer_index],
-                                                        self._anchor_offset[layer_index])
+                                                        self._anchor_scales[layer_index], # [(0.1,), (0.2,), (0.375,), (0.55,), (0.725,), (0.9,)]
+                                                        self._extra_anchor_scales[layer_index], # [(0.1414,), (0.2739,), (0.4541,), (0.6315,), (0.8078,), (0.9836,)]
+                                                        self._anchor_ratios[layer_index], # [(1., 2., 0.5), (1., 2., 3., 0.5, 0.3333), (1., 2., 3., 0.5, 0.3333), (1., 2., 3., 0.5, 0.3333), (1., 2., 0.5), (1., 2., 0.5)]
+                                                        self._layer_steps[layer_index], # [8, 16, 32, 64, 100, 300]
+                                                        self._anchor_offset[layer_index]) # [0.5] * len(self._layers_shapes)
             all_anchors.append(anchors_this_layer[:-2])
             all_num_anchors_depth.append(anchors_this_layer[-2])
             all_num_anchors_spatial.append(anchors_this_layer[-1])

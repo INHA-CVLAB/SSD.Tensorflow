@@ -24,105 +24,61 @@ import tensorflow as tf
 from net import ssd_net
 
 from dataset import dataset_common
-from preprocessing import ssd_preprocessing
+from preprocessing_ import ssd_preprocessing
 from utility import anchor_manipulator
 from utility import scaffolds
 
 # hardware related configuration
-tf.app.flags.DEFINE_integer(
-    'num_readers', 8,
-    'The number of parallel readers that read data from the dataset.')
-tf.app.flags.DEFINE_integer(
-    'num_preprocessing_threads', 24,
-    'The number of threads used to create the batches.')
-tf.app.flags.DEFINE_integer(
-    'num_cpu_threads', 0,
-    'The number of cpu cores used to train.')
-tf.app.flags.DEFINE_float(
-    'gpu_memory_fraction', 1., 'GPU memory fraction to use.')
+tf.app.flags.DEFINE_integer('num_readers', 8,'The number of parallel readers that read data from the dataset.') #
+tf.app.flags.DEFINE_integer('num_preprocessing_threads', 24,'The number of threads used to create the batches.') #
+tf.app.flags.DEFINE_integer('num_cpu_threads', 0,'The number of cpu cores used to train.')
+tf.app.flags.DEFINE_float('gpu_memory_fraction', 1., 'GPU memory fraction to use.')
+
 # scaffold related configuration
-tf.app.flags.DEFINE_string(
-    'data_dir', './dataset/tfrecords',
-    'The directory where the dataset input data is stored.')
-tf.app.flags.DEFINE_integer(
-    'num_classes', 21, 'Number of classes to use in the dataset.')
-tf.app.flags.DEFINE_string(
-    'model_dir', './logs/',
-    'The directory where the model will be stored.')
-tf.app.flags.DEFINE_integer(
-    'log_every_n_steps', 10,
-    'The frequency with which logs are printed.')
-tf.app.flags.DEFINE_integer(
-    'save_summary_steps', 500,
-    'The frequency with which summaries are saved, in seconds.')
-tf.app.flags.DEFINE_integer(
-    'save_checkpoints_secs', 7200,
-    'The frequency with which the model is saved, in seconds.')
+tf.app.flags.DEFINE_string('data_dir', './dataset/tfrecords/dome', 'The directory where the dataset input data is stored.')
+tf.app.flags.DEFINE_integer('num_classes', 15, 'Number of classes to use in the dataset.')         #<-----------
+tf.app.flags.DEFINE_string('model_dir', './logs/dome','The directory where the model will be stored.') #<-----------
+tf.app.flags.DEFINE_integer('log_every_n_steps', 10,'The frequency with which logs are printed.')
+tf.app.flags.DEFINE_integer('save_summary_steps', 500,'The frequency with which summaries are saved, in seconds.')
+tf.app.flags.DEFINE_integer('save_checkpoints_secs', 7200,'The frequency with which the model is saved, in seconds.') #
+
 # model related configuration
-tf.app.flags.DEFINE_integer(
-    'train_image_size', 300,
-    'The size of the input image for the model to use.')
-tf.app.flags.DEFINE_integer(
-    'train_epochs', None,
-    'The number of epochs to use for training.')
-tf.app.flags.DEFINE_integer(
-    'max_number_of_steps', 120000,
-    'The max number of steps to use for training.')
-tf.app.flags.DEFINE_integer(
-    'batch_size', 32,
-    'Batch size for training and evaluation.')
-tf.app.flags.DEFINE_string(
-    'data_format', 'channels_first', # 'channels_first' or 'channels_last'
-    'A flag to override the data format used in the model. channels_first '
-    'provides a performance boost on GPU but is not always compatible '
-    'with CPU. If left unspecified, the data format will be chosen '
-    'automatically based on whether TensorFlow was built for CPU or GPU.')
-tf.app.flags.DEFINE_float(
-    'negative_ratio', 3., 'Negative ratio in the loss function.')
-tf.app.flags.DEFINE_float(
-    'match_threshold', 0.5, 'Matching threshold in the loss function.')
-tf.app.flags.DEFINE_float(
-    'neg_threshold', 0.5, 'Matching threshold for the negtive examples in the loss function.')
+tf.app.flags.DEFINE_integer('train_image_size', 300,'The size of the input image for the model to use.')
+tf.app.flags.DEFINE_integer('train_epochs', None,'The number of epochs to use for training.')
+tf.app.flags.DEFINE_integer('max_number_of_steps', 120000,'The max number of steps to use for training.')
+tf.app.flags.DEFINE_integer('batch_size', 32,'Batch size for training and evaluation.')
+tf.app.flags.DEFINE_string( 'data_format', 'channels_first', # 'channels_first' or 'channels_last'
+                            'A flag to override the data format used in the model. channels_first '
+                            'provides a performance boost on GPU but is not always compatible '
+                            'with CPU. If left unspecified, the data format will be chosen '
+                            'automatically based on whether TensorFlow was built for CPU or GPU.')
+tf.app.flags.DEFINE_float('negative_ratio', 3., 'Negative ratio in the loss function.') #
+tf.app.flags.DEFINE_float('match_threshold', 0.5, 'Matching threshold in the loss function.') #
+tf.app.flags.DEFINE_float('neg_threshold', 0.5, 'Matching threshold for the negtive examples in the loss function.') #
+
 # optimizer related configuration
-tf.app.flags.DEFINE_integer(
-    'tf_random_seed', 20180503, 'Random seed for TensorFlow initializers.')
-tf.app.flags.DEFINE_float(
-    'weight_decay', 5e-4, 'The weight decay on the model weights.')
-tf.app.flags.DEFINE_float(
-    'momentum', 0.9,
-    'The momentum for the MomentumOptimizer and RMSPropOptimizer.')
+tf.app.flags.DEFINE_integer('tf_random_seed', 20180503, 'Random seed for TensorFlow initializers.')
+tf.app.flags.DEFINE_float('weight_decay', 5e-4, 'The weight decay on the model weights.')
+tf.app.flags.DEFINE_float('momentum', 0.9, 'The momentum for the MomentumOptimizer and RMSPropOptimizer.')
 tf.app.flags.DEFINE_float('learning_rate', 1e-3, 'Initial learning rate.')
-tf.app.flags.DEFINE_float(
-    'end_learning_rate', 0.000001,
-    'The minimal end learning rate used by a polynomial decay learning rate.')
+tf.app.flags.DEFINE_float('end_learning_rate', 0.000001,'The minimal end learning rate used by a polynomial decay learning rate.')
+
 # for learning rate piecewise_constant decay
-tf.app.flags.DEFINE_string(
-    'decay_boundaries', '500, 80000, 100000',
-    'Learning rate decay boundaries by global_step (comma-separated list).')
-tf.app.flags.DEFINE_string(
-    'lr_decay_factors', '0.1, 1, 0.1, 0.01',
-    'The values of learning_rate decay factor for each segment between boundaries (comma-separated list).')
+tf.app.flags.DEFINE_string('decay_boundaries', '500, 80000, 100000', 'Learning rate decay boundaries by global_step (comma-separated list).')
+tf.app.flags.DEFINE_string('lr_decay_factors', '0.1, 1, 0.1, 0.01', 'The values of learning_rate decay factor for each segment between boundaries (comma-separated list).')
+
 # checkpoint related configuration
-tf.app.flags.DEFINE_string(
-    'checkpoint_path', './model',
-    'The path to a checkpoint from which to fine-tune.')
-tf.app.flags.DEFINE_string(
-    'checkpoint_model_scope', 'vgg_16',
-    'Model scope in the checkpoint. None if the same as the trained model.')
-tf.app.flags.DEFINE_string(
-    'model_scope', 'ssd300',
-    'Model scope name used to replace the name_scope in checkpoint.')
-tf.app.flags.DEFINE_string(
-    'checkpoint_exclude_scopes', 'ssd300/multibox_head, ssd300/additional_layers, ssd300/conv4_3_scale',
-    'Comma-separated list of scopes of variables to exclude when restoring from a checkpoint.')
-tf.app.flags.DEFINE_boolean(
-    'ignore_missing_vars', True,
-    'When restoring a checkpoint would ignore missing variables.')
-tf.app.flags.DEFINE_boolean(
-    'multi_gpu', True,
-    'Whether there is GPU to use for training.')
+tf.app.flags.DEFINE_string('checkpoint_path', './model', 'The path to a checkpoint from which to fine-tune.')
+tf.app.flags.DEFINE_string('checkpoint_model_scope', 'vgg_16', 'Model scope in the checkpoint. None if the same as the trained model.')
+tf.app.flags.DEFINE_string('model_scope', 'ssd300','Model scope name used to replace the name_scope in checkpoint.')
+tf.app.flags.DEFINE_string('checkpoint_exclude_scopes',
+                           'ssd300/multibox_head, ssd300/additional_layers, ssd300/conv4_3_scale',
+                            'Comma-separated list of scopes of variables to exclude when restoring from a checkpoint.')
+tf.app.flags.DEFINE_boolean('ignore_missing_vars', True,'When restoring a checkpoint would ignore missing variables.')
+tf.app.flags.DEFINE_boolean('multi_gpu', True,'Whether there is GPU to use for training.')
 
 FLAGS = tf.app.flags.FLAGS
+
 #CUDA_VISIBLE_DEVICES
 def validate_batch_size_for_multi_gpu(batch_size):
     """For multi-gpu, batch-size must be a multiple of the number of
@@ -167,11 +123,11 @@ def input_pipeline(dataset_pattern='train-*', is_training=True, batch_size=FLAGS
     def input_fn():
         out_shape = [FLAGS.train_image_size] * 2
         anchor_creator = anchor_manipulator.AnchorCreator(out_shape,
-                                                    layers_shapes = [(38, 38), (19, 19), (10, 10), (5, 5), (3, 3), (1, 1)],
-                                                    anchor_scales = [(0.1,), (0.2,), (0.375,), (0.55,), (0.725,), (0.9,)],
-                                                    extra_anchor_scales = [(0.1414,), (0.2739,), (0.4541,), (0.6315,), (0.8078,), (0.9836,)],
-                                                    anchor_ratios = [(1., 2., .5), (1., 2., 3., .5, 0.3333), (1., 2., 3., .5, 0.3333), (1., 2., 3., .5, 0.3333), (1., 2., .5), (1., 2., .5)],
-                                                    layer_steps = [8, 16, 32, 64, 100, 300])
+                                                        layers_shapes = [(38, 38), (19, 19), (10, 10), (5, 5), (3, 3), (1, 1)],
+                                                        anchor_scales = [(0.1,), (0.2,), (0.375,), (0.55,), (0.725,), (0.9,)],
+                                                        extra_anchor_scales = [(0.1414,), (0.2739,), (0.4541,), (0.6315,), (0.8078,), (0.9836,)],
+                                                        anchor_ratios = [(1., 2., .5), (1., 2., 3., .5, 0.3333), (1., 2., 3., .5, 0.3333), (1., 2., 3., .5, 0.3333), (1., 2., .5), (1., 2., .5)],
+                                                        layer_steps = [8, 16, 32, 64, 100, 300])
         all_anchors, all_num_anchors_depth, all_num_anchors_spatial = anchor_creator.get_all_anchors()
 
         num_anchors_per_layer = []
@@ -179,23 +135,23 @@ def input_pipeline(dataset_pattern='train-*', is_training=True, batch_size=FLAGS
             num_anchors_per_layer.append(all_num_anchors_depth[ind] * all_num_anchors_spatial[ind])
 
         anchor_encoder_decoder = anchor_manipulator.AnchorEncoder(allowed_borders = [1.0] * 6,
-                                                            positive_threshold = FLAGS.match_threshold,
-                                                            ignore_threshold = FLAGS.neg_threshold,
-                                                            prior_scaling=[0.1, 0.1, 0.2, 0.2])
+                                                                  positive_threshold = FLAGS.match_threshold, #0.5
+                                                                  ignore_threshold = FLAGS.neg_threshold, #0.5
+                                                                  prior_scaling=[0.1, 0.1, 0.2, 0.2])
 
         image_preprocessing_fn = lambda image_, labels_, bboxes_ : ssd_preprocessing.preprocess_image(image_, labels_, bboxes_, out_shape, is_training=is_training, data_format=FLAGS.data_format, output_rgb=False)
         anchor_encoder_fn = lambda glabels_, gbboxes_: anchor_encoder_decoder.encode_all_anchors(glabels_, gbboxes_, all_anchors, all_num_anchors_depth, all_num_anchors_spatial)
 
-        image, _, shape, loc_targets, cls_targets, match_scores = dataset_common.slim_get_batch(FLAGS.num_classes,
-                                                                                batch_size,
-                                                                                ('train' if is_training else 'val'),
-                                                                                os.path.join(FLAGS.data_dir, dataset_pattern),
-                                                                                FLAGS.num_readers,
-                                                                                FLAGS.num_preprocessing_threads,
-                                                                                image_preprocessing_fn,
-                                                                                anchor_encoder_fn,
-                                                                                num_epochs=FLAGS.train_epochs,
-                                                                                is_training=is_training)
+        image, _, shape, loc_targets, cls_targets, match_scores = dataset_common.slim_get_batch(FLAGS.num_classes, #21
+                                                                                                batch_size, #32
+                                                                                                ('train' if is_training else 'val'),
+                                                                                                os.path.join(FLAGS.data_dir, dataset_pattern),
+                                                                                                FLAGS.num_readers, #8
+                                                                                                FLAGS.num_preprocessing_threads, #24
+                                                                                                image_preprocessing_fn, #
+                                                                                                anchor_encoder_fn, #
+                                                                                                num_epochs=FLAGS.train_epochs,
+                                                                                                is_training=is_training)
         global global_anchor_info
         global_anchor_info = {'decode_fn': lambda pred : anchor_encoder_decoder.decode_all_anchors(pred, num_anchors_per_layer),
                             'num_anchors_per_layer': num_anchors_per_layer,
@@ -451,13 +407,11 @@ def main(_):
         'l2': 'l2_loss',
         'acc': 'post_forward/cls_accuracy',
     }
-    logging_hook = tf.train.LoggingTensorHook(tensors=tensors_to_log, every_n_iter=FLAGS.log_every_n_steps,
-                                            formatter=lambda dicts: (', '.join(['%s=%.6f' % (k, v) for k, v in dicts.items()])))
+    logging_hook = tf.train.LoggingTensorHook(tensors=tensors_to_log, every_n_iter=FLAGS.log_every_n_steps, formatter=lambda dicts: (', '.join(['%s=%.6f' % (k, v) for k, v in dicts.items()])))
 
     #hook = tf.train.ProfilerHook(save_steps=50, output_dir='.', show_memory=True)
     print('Starting a training cycle.')
-    ssd_detector.train(input_fn=input_pipeline(dataset_pattern='train-*', is_training=True, batch_size=FLAGS.batch_size),
-                    hooks=[logging_hook], max_steps=FLAGS.max_number_of_steps)
+    ssd_detector.train(input_fn=input_pipeline(dataset_pattern='V_*', is_training=True, batch_size=FLAGS.batch_size), hooks=[logging_hook], max_steps=FLAGS.max_number_of_steps)
 
 if __name__ == '__main__':
   tf.logging.set_verbosity(tf.logging.INFO)

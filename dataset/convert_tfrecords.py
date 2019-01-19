@@ -43,13 +43,13 @@ import dataset_common
        |    |->Annotations/
        |    |->...
 '''
-tf.app.flags.DEFINE_string('dataset_directory', '/media/rs/7A0EE8880EE83EAF/Detections/PASCAL/VOC',
+tf.app.flags.DEFINE_string('dataset_directory', '/media/anaconda/SSD/Data_Utilize/Dataset/PascalVoc/',
                            'All datas directory')
 tf.app.flags.DEFINE_string('train_splits', 'VOC2007, VOC2012',
                            'Comma-separated list of the training data sub-directory')
 tf.app.flags.DEFINE_string('validation_splits', 'VOC2007TEST',
                            'Comma-separated list of the validation data sub-directory')
-tf.app.flags.DEFINE_string('output_directory', '/media/rs/7A0EE8880EE83EAF/Detections/SSD/dataset/tfrecords',
+tf.app.flags.DEFINE_string('output_directory', '/media/anaconda/SSD/Data_Utilize/Dataset/PascalVoc/',
                            'Output data directory')
 tf.app.flags.DEFINE_integer('train_shards', 16,
                             'Number of shards in training TFRecord files.')
@@ -157,16 +157,14 @@ class ImageCoder(object):
     self._decode_jpeg = tf.image.decode_jpeg(self._decode_jpeg_data, channels=3)
 
   def png_to_jpeg(self, image_data):
-    return self._sess.run(self._png_to_jpeg,
-                          feed_dict={self._png_data: image_data})
+    return self._sess.run(self._png_to_jpeg, feed_dict={self._png_data: image_data})
 
   def cmyk_to_rgb(self, image_data):
-    return self._sess.run(self._cmyk_to_rgb,
-                          feed_dict={self._cmyk_data: image_data})
+    return self._sess.run(self._cmyk_to_rgb, feed_dict={self._cmyk_data: image_data})
 
   def decode_jpeg(self, image_data):
-    image = self._sess.run(self._decode_jpeg,
-                           feed_dict={self._decode_jpeg_data: image_data})
+    image = self._sess.run(self._decode_jpeg, feed_dict={self._decode_jpeg_data: image_data})
+
     assert len(image.shape) == 3
     assert image.shape[2] == 3
     return image
@@ -258,8 +256,7 @@ def _process_image_files_batch(coder, thread_index, ranges, name, directory, all
   Args:
     coder: instance of ImageCoder to provide TensorFlow image coding utils.
     thread_index: integer, unique batch to run index is within [0, len(ranges)).
-    ranges: list of pairs of integers specifying ranges of each batches to
-      analyze in parallel.
+    ranges: list of pairs of integers specifying ranges of each batches to analyze in parallel.
     name: string, unique identifier specifying the data set
     directory: string; the path of all datas
     all_records: list of string tuples; the first of each tuple is the sub-directory of the record, the second is the image filename.
@@ -272,9 +269,7 @@ def _process_image_files_batch(coder, thread_index, ranges, name, directory, all
   assert not num_shards % num_threads
   num_shards_per_batch = int(num_shards / num_threads)
 
-  shard_ranges = np.linspace(ranges[thread_index][0],
-                             ranges[thread_index][1],
-                             num_shards_per_batch + 1).astype(int)
+  shard_ranges = np.linspace(ranges[thread_index][0], ranges[thread_index][1], num_shards_per_batch + 1).astype(int)
   num_files_in_thread = ranges[thread_index][1] - ranges[thread_index][0]
 
   counter = 0
@@ -287,6 +282,7 @@ def _process_image_files_batch(coder, thread_index, ranges, name, directory, all
 
     shard_counter = 0
     files_in_shard = np.arange(shard_ranges[s], shard_ranges[s + 1], dtype=int)
+
     for i in files_in_shard:
       cur_record = all_records[i]
       filename = os.path.join(directory, cur_record[0], 'JPEGImages', cur_record[1])
@@ -294,24 +290,21 @@ def _process_image_files_batch(coder, thread_index, ranges, name, directory, all
       bboxes, labels, labels_text, difficult, truncated = _find_image_bounding_boxes(directory, cur_record)
       image_buffer, height, width = _process_image(filename, coder)
 
-      example = _convert_to_example(filename, cur_record[1], image_buffer, bboxes, labels, labels_text,
-                                    difficult, truncated, height, width)
+      example = _convert_to_example(filename, cur_record[1], image_buffer, bboxes, labels, labels_text, difficult, truncated, height, width)
+
       writer.write(example.SerializeToString())
       shard_counter += 1
       counter += 1
 
       if not counter % 1000:
-        print('%s [thread %d]: Processed %d of %d images in thread batch.' %
-              (datetime.now(), thread_index, counter, num_files_in_thread))
+        print('%s [thread %d]: Processed %d of %d images in thread batch.' %(datetime.now(), thread_index, counter, num_files_in_thread))
         sys.stdout.flush()
 
     writer.close()
-    print('%s [thread %d]: Wrote %d images to %s' %
-          (datetime.now(), thread_index, shard_counter, output_file))
+    print('%s [thread %d]: Wrote %d images to %s' %(datetime.now(), thread_index, shard_counter, output_file))
     sys.stdout.flush()
     shard_counter = 0
-  print('%s [thread %d]: Wrote %d images to %d shards.' %
-        (datetime.now(), thread_index, counter, num_files_in_thread))
+  print('%s [thread %d]: Wrote %d images to %d shards.' %(datetime.now(), thread_index, counter, num_files_in_thread))
   sys.stdout.flush()
 
 def _process_image_files(name, directory, all_records, num_shards):
@@ -373,6 +366,7 @@ def _process_dataset(name, directory, all_splits, num_shards):
   random.seed(RANDOM_SEED)
   random.shuffle(shuffled_index)
   all_records = [all_records[i] for i in shuffled_index]
+
   _process_image_files(name, directory, all_records, num_shards)
 
 def parse_comma_list(args):

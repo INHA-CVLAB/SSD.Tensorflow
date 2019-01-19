@@ -26,7 +26,7 @@ import numpy as np
 from net import ssd_net
 
 from dataset import dataset_common
-from preprocessing import ssd_preprocessing
+from preprocessing_ import ssd_preprocessing
 from utility import anchor_manipulator
 from utility import scaffolds
 
@@ -248,10 +248,8 @@ def parse_by_class(cls_pred, bboxes_pred, num_classes, select_threshold, min_siz
             #ymin, xmin, ymax, xmax = tf.split(selected_bboxes[class_ind], 4, axis=-1)
             #ymin, xmin, ymax, xmax = tf.squeeze(ymin), tf.squeeze(xmin), tf.squeeze(ymax), tf.squeeze(xmax)
             ymin, xmin, ymax, xmax = clip_bboxes(ymin, xmin, ymax, xmax, 'clip_bboxes_{}'.format(class_ind))
-            ymin, xmin, ymax, xmax, selected_scores[class_ind] = filter_bboxes(selected_scores[class_ind],
-                                                ymin, xmin, ymax, xmax, min_size, 'filter_bboxes_{}'.format(class_ind))
-            ymin, xmin, ymax, xmax, selected_scores[class_ind] = sort_bboxes(selected_scores[class_ind],
-                                                ymin, xmin, ymax, xmax, keep_topk, 'sort_bboxes_{}'.format(class_ind))
+            ymin, xmin, ymax, xmax, selected_scores[class_ind] = filter_bboxes(selected_scores[class_ind], ymin, xmin, ymax, xmax, min_size, 'filter_bboxes_{}'.format(class_ind))
+            ymin, xmin, ymax, xmax, selected_scores[class_ind] = sort_bboxes(selected_scores[class_ind], ymin, xmin, ymax, xmax, keep_topk, 'sort_bboxes_{}'.format(class_ind))
             selected_bboxes[class_ind] = tf.stack([ymin, xmin, ymax, xmax], axis=-1)
             selected_scores[class_ind], selected_bboxes[class_ind] = nms_bboxes(selected_scores[class_ind], selected_bboxes[class_ind], nms_topk, nms_threshold, 'nms_bboxes_{}'.format(class_ind))
 
@@ -447,9 +445,9 @@ def main(_):
                     if not valid_mask[det_ind]:
                         continue
                     f.write('{:s} {:.3f} {:.1f} {:.1f} {:.1f} {:.1f}\n'.
-                                format(filename.decode('utf8')[:-4], scores[det_ind],
-                                       bboxes[det_ind, 1], bboxes[det_ind, 0],
-                                       bboxes[det_ind, 3], bboxes[det_ind, 2]))
+                           format(filename.decode('utf8')[:-4], scores[det_ind],
+                           bboxes[det_ind, 1], bboxes[det_ind, 0],
+                           bboxes[det_ind, 3], bboxes[det_ind, 2]))
 
 
 if __name__ == '__main__':

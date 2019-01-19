@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright 2018 Changan Wang
 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # =============================================================================
+
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -26,39 +28,31 @@ import numpy as np
 from net import ssd_net
 
 from dataset import dataset_common
-from preprocessing import ssd_preprocessing
+from preprocessing_ import ssd_preprocessing
 from utility import anchor_manipulator
 from utility import draw_toolbox
 
 # scaffold related configuration
-tf.app.flags.DEFINE_integer(
-    'num_classes', 21, 'Number of classes to use in the dataset.')
+tf.app.flags.DEFINE_integer('num_classes', 21, 'Number of classes to use in the dataset.')
 # model related configuration
-tf.app.flags.DEFINE_integer(
-    'train_image_size', 300,
+tf.app.flags.DEFINE_integer('train_image_size', 300,
     'The size of the input image for the model to use.')
+
 tf.app.flags.DEFINE_string(
     'data_format', 'channels_last', # 'channels_first' or 'channels_last'
     'A flag to override the data format used in the model. channels_first '
     'provides a performance boost on GPU but is not always compatible '
     'with CPU. If left unspecified, the data format will be chosen '
     'automatically based on whether TensorFlow was built for CPU or GPU.')
-tf.app.flags.DEFINE_float(
-    'select_threshold', 0.2, 'Class-specific confidence score threshold for selecting a box.')
-tf.app.flags.DEFINE_float(
-    'min_size', 0.03, 'The min size of bboxes to keep.')
-tf.app.flags.DEFINE_float(
-    'nms_threshold', 0.45, 'Matching threshold in NMS algorithm.')
-tf.app.flags.DEFINE_integer(
-    'nms_topk', 20, 'Number of total object to keep after NMS.')
-tf.app.flags.DEFINE_integer(
-    'keep_topk', 200, 'Number of total object to keep for each image before nms.')
+tf.app.flags.DEFINE_float('select_threshold', 0.2, 'Class-specific confidence score threshold for selecting a box.')
+tf.app.flags.DEFINE_float('min_size', 0.03, 'The min size of bboxes to keep.')
+tf.app.flags.DEFINE_float('nms_threshold', 0.45, 'Matching threshold in NMS algorithm.')
+tf.app.flags.DEFINE_integer('nms_topk', 20, 'Number of total object to keep after NMS.')
+tf.app.flags.DEFINE_integer('keep_topk', 200, 'Number of total object to keep for each image before nms.')
 # checkpoint related configuration
-tf.app.flags.DEFINE_string(
-    'checkpoint_path', './logs',
+tf.app.flags.DEFINE_string('checkpoint_path', 'logs',
     'The path to a checkpoint from which to fine-tune.')
-tf.app.flags.DEFINE_string(
-    'model_scope', 'ssd300',
+tf.app.flags.DEFINE_string('model_scope', 'ssd300',
     'Model scope name used to replace the name_scope in checkpoint.')
 
 FLAGS = tf.app.flags.FLAGS
@@ -131,14 +125,13 @@ def parse_by_class(cls_pred, bboxes_pred, num_classes, select_threshold, min_siz
     with tf.name_scope('select_bboxes', [cls_pred, bboxes_pred]):
         scores_pred = tf.nn.softmax(cls_pred)
         selected_bboxes, selected_scores = select_bboxes(scores_pred, bboxes_pred, num_classes, select_threshold)
+
         for class_ind in range(1, num_classes):
             ymin, xmin, ymax, xmax = tf.unstack(selected_bboxes[class_ind], 4, axis=-1)
             #ymin, xmin, ymax, xmax = tf.squeeze(ymin), tf.squeeze(xmin), tf.squeeze(ymax), tf.squeeze(xmax)
             ymin, xmin, ymax, xmax = clip_bboxes(ymin, xmin, ymax, xmax, 'clip_bboxes_{}'.format(class_ind))
-            ymin, xmin, ymax, xmax, selected_scores[class_ind] = filter_bboxes(selected_scores[class_ind],
-                                                ymin, xmin, ymax, xmax, min_size, 'filter_bboxes_{}'.format(class_ind))
-            ymin, xmin, ymax, xmax, selected_scores[class_ind] = sort_bboxes(selected_scores[class_ind],
-                                                ymin, xmin, ymax, xmax, keep_topk, 'sort_bboxes_{}'.format(class_ind))
+            ymin, xmin, ymax, xmax, selected_scores[class_ind] = filter_bboxes(selected_scores[class_ind], ymin, xmin, ymax, xmax, min_size, 'filter_bboxes_{}'.format(class_ind))
+            ymin, xmin, ymax, xmax, selected_scores[class_ind] = sort_bboxes(selected_scores[class_ind], ymin, xmin, ymax, xmax, keep_topk, 'sort_bboxes_{}'.format(class_ind))
             selected_bboxes[class_ind] = tf.stack([ymin, xmin, ymax, xmax], axis=-1)
             selected_scores[class_ind], selected_bboxes[class_ind] = nms_bboxes(selected_scores[class_ind], selected_bboxes[class_ind], nms_topk, nms_threshold, 'nms_bboxes_{}'.format(class_ind))
 
@@ -152,7 +145,7 @@ def main(_):
         shape_input = tf.placeholder(tf.int32, shape=(2,))
 
         features = ssd_preprocessing.preprocess_for_eval(image_input, out_shape, data_format=FLAGS.data_format, output_rgb=False)
-        features = tf.expand_dims(features, axis=0)
+        features = tf.expand_dims(features, axis=0) #(N, W, H, C)
 
         anchor_creator = anchor_manipulator.AnchorCreator(out_shape,
                                                     layers_shapes = [(38, 38), (19, 19), (10, 10), (5, 5), (3, 3), (1, 1)],
@@ -164,16 +157,18 @@ def main(_):
         all_anchors, all_num_anchors_depth, all_num_anchors_spatial = anchor_creator.get_all_anchors()
 
         anchor_encoder_decoder = anchor_manipulator.AnchorEncoder(allowed_borders = [1.0] * 6,
-                                                            positive_threshold = None,
-                                                            ignore_threshold = None,
-                                                            prior_scaling=[0.1, 0.1, 0.2, 0.2])
+                                                                positive_threshold = None,
+                                                                ignore_threshold = None,
+                                                                prior_scaling=[0.1, 0.1, 0.2, 0.2])
 
         decode_fn = lambda pred : anchor_encoder_decoder.ext_decode_all_anchors(pred, all_anchors, all_num_anchors_depth, all_num_anchors_spatial)
 
         with tf.variable_scope(FLAGS.model_scope, default_name=None, values=[features], reuse=tf.AUTO_REUSE):
-            backbone = ssd_net.VGG16Backbone(FLAGS.data_format)
+            #backbone = ssd_net.VGG16Backbone(FLAGS.data_format)
+            backbone = ssd_net.MobileNetV2Backbone(FLAGS.data_format)
             feature_layers = backbone.forward(features, training=False)
             location_pred, cls_pred = ssd_net.multibox_head(feature_layers, FLAGS.num_classes, all_num_anchors_depth, data_format=FLAGS.data_format)
+
             if FLAGS.data_format == 'channels_first':
                 cls_pred = [tf.transpose(pred, [0, 2, 3, 1]) for pred in cls_pred]
                 location_pred = [tf.transpose(pred, [0, 2, 3, 1]) for pred in location_pred]
@@ -186,7 +181,7 @@ def main(_):
 
         with tf.device('/cpu:0'):
             bboxes_pred = decode_fn(location_pred)
-            bboxes_pred = tf.concat(bboxes_pred, axis=0)
+            bboxes_pred = tf.concat(bboxes_pred, axis=0) #
             selected_bboxes, selected_scores = parse_by_class(cls_pred, bboxes_pred,
                                                             FLAGS.num_classes, FLAGS.select_threshold, FLAGS.min_size,
                                                             FLAGS.keep_topk, FLAGS.nms_topk, FLAGS.nms_threshold)
